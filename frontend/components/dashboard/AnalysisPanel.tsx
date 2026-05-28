@@ -13,8 +13,35 @@ interface Props {
   summary: IndicatorSummary;
 }
 
-const TABS = ["🔍 Analysis", "📊 Order Book", "📰 News"] as const;
+const TABS = ["🔍 Analysis", "📰 News"] as const;
 type Tab = typeof TABS[number];
+
+// ── News sentiment ───────────────────────────────────────────────────────────
+
+const BULL_KW = [
+  "beat", "beats", "surges", "surge", "rally", "rallies", "upgrade", "upgraded",
+  "buy", "strong", "growth", "gain", "gains", "rises", "soars", "soared",
+  "outperforms", "exceeds", "record", "profit", "profits", "bullish", "positive",
+  "breakthrough", "partnership", "deal", "raises guidance", "raises forecast",
+  "better than expected", "above estimates", "dividend", "buyback",
+];
+
+const BEAR_KW = [
+  "miss", "misses", "missed", "falls", "fall", "drops", "drop", "decline",
+  "declines", "downgrade", "downgraded", "sell", "weak", "loss", "losses",
+  "lawsuit", "investigation", "concern", "warning", "cut", "cuts", "layoff",
+  "layoffs", "fraud", "bearish", "negative", "below estimates", "disappoints",
+  "disappointing", "worse than expected", "recall", "probe", "fine", "penalty",
+];
+
+function scoreSentiment(title = ""): "bullish" | "bearish" | "neutral" {
+  const t = title.toLowerCase();
+  const b = BULL_KW.filter((w) => t.includes(w)).length;
+  const r = BEAR_KW.filter((w) => t.includes(w)).length;
+  if (b > r) return "bullish";
+  if (r > b) return "bearish";
+  return "neutral";
+}
 
 // ── Glossary ────────────────────────────────────────────────────────────────
 
@@ -425,51 +452,74 @@ export function AnalysisPanel({ ticker, info, news, summary }: Props) {
           </div>
         )}
 
-        {/* ── Order Book Tab ──────────────────────────────────────────────── */}
-        {activeTab === "📊 Order Book" && (
-          <div className="animate-fade-in">
-            <Card className="mb-4">
-              <CardTitle>Market Data</CardTitle>
-              {[
-                info.ask  != null && ["Ask",        `$${(info.ask  as number).toFixed(2)}${info.askSize ? ` × ${info.askSize}` : ""}`, "text-[#FF0055]"],
-                info.bid  != null && ["Bid",        `$${(info.bid  as number).toFixed(2)}${info.bidSize ? ` × ${info.bidSize}` : ""}`, "text-[#00FF9D]"],
-                info.open != null && ["Open",       `$${(info.open as number).toFixed(2)}`,     "text-slate-800 dark:text-slate-200"],
-                info.previousClose != null && ["Prev Close", `$${(info.previousClose as number).toFixed(2)}`, "text-slate-800 dark:text-slate-200"],
-                (info.dayHigh && info.dayLow) != null && ["Day Range", `$${(info.dayLow as number).toFixed(2)} – $${(info.dayHigh as number).toFixed(2)}`, "text-slate-800 dark:text-slate-200"],
-                info.volume != null && ["Volume",   (info.volume as number).toLocaleString(),  "text-slate-800 dark:text-slate-200"],
-              ].filter((x): x is string[] => Boolean(x)).map(([lbl, val, cls]) => (
-                <div key={lbl as string} className="flex justify-between py-2 border-b border-slate-200 dark:border-dark-border last:border-0 text-sm">
-                  <span className="text-slate-500 text-xs">{lbl}</span>
-                  <span className={`font-semibold font-mono ${cls}`}>{val}</span>
-                </div>
-              ))}
-            </Card>
-          </div>
-        )}
-
         {/* ── News Tab ────────────────────────────────────────────────────── */}
         {activeTab === "📰 News" && (
-          <div className="animate-fade-in space-y-0">
+          <div className="animate-fade-in">
             {news.length === 0 ? (
               <p className="text-center text-slate-500 text-sm py-8">No recent news for {ticker}.</p>
-            ) : news.map((item, i) => (
-              <div key={i} className="py-3 border-b border-slate-200 dark:border-dark-border last:border-0">
-                <a
-                  href={item.link ?? "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-snug hover:text-[#00C8FF] transition-colors block mb-1"
-                >
-                  {item.title}
-                </a>
-                <div className="flex gap-2 text-[0.63rem] text-slate-400">
-                  {item.publisher && <span className="text-[#00C8FF] font-semibold">{item.publisher}</span>}
-                  {item.providerPublishTime && (
-                    <span>{new Date(item.providerPublishTime * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                  )}
-                </div>
-              </div>
-            ))}
+            ) : (() => {
+              const scored = news.map((item) => ({ item, sentiment: scoreSentiment(item.title) }));
+              const bullCount = scored.filter((s) => s.sentiment === "bullish").length;
+              const bearCount = scored.filter((s) => s.sentiment === "bearish").length;
+              const neutCount = scored.filter((s) => s.sentiment === "neutral").length;
+              const total     = scored.length;
+
+              return (
+                <>
+                  {/* Aggregate bar */}
+                  <div className="mb-4 rounded-xl border border-light-border dark:border-dark-border bg-light-bg3 dark:bg-dark-bg3 p-3">
+                    <div className="flex gap-2 mb-2.5 flex-wrap">
+                      <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-[#00FF9D12] dark:border-[#00FF9D33] dark:text-[#00FF9D]">
+                        ▲ {bullCount} Bullish
+                      </span>
+                      <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-600 dark:bg-[#FF005512] dark:border-[#FF005533] dark:text-[#FF0055]">
+                        ▼ {bearCount} Bearish
+                      </span>
+                      <span className="text-[0.65rem] font-bold px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-500 dark:bg-[#1a2540] dark:border-[#243050] dark:text-slate-400">
+                        — {neutCount} Neutral
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-200 dark:bg-[#1a2540] overflow-hidden flex">
+                      <div className="h-full bg-emerald-500 dark:bg-[#00FF9D] transition-all" style={{ width: `${(bullCount / total) * 100}%` }} />
+                      <div className="h-full bg-red-500 dark:bg-[#FF0055] transition-all"     style={{ width: `${(bearCount / total) * 100}%` }} />
+                    </div>
+                  </div>
+
+                  {/* News list */}
+                  <div className="space-y-0">
+                    {scored.map(({ item, sentiment }, i) => (
+                      <div key={i} className="flex gap-3 py-3 border-b border-slate-200 dark:border-dark-border last:border-0">
+                        <span className={`mt-0.5 shrink-0 text-[0.55rem] font-bold px-1.5 py-0.5 rounded border h-fit ${
+                          sentiment === "bullish"
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-[#00FF9D12] dark:border-[#00FF9D33] dark:text-[#00FF9D]"
+                            : sentiment === "bearish"
+                            ? "bg-red-50 border-red-200 text-red-600 dark:bg-[#FF005512] dark:border-[#FF005533] dark:text-[#FF0055]"
+                            : "bg-slate-100 border-slate-200 text-slate-400 dark:bg-[#1a2540] dark:border-[#243050] dark:text-slate-500"
+                        }`}>
+                          {sentiment === "bullish" ? "BULL" : sentiment === "bearish" ? "BEAR" : "NEUT"}
+                        </span>
+                        <div className="min-w-0">
+                          <a
+                            href={item.link ?? "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-snug hover:text-sky-600 dark:hover:text-[#00C8FF] transition-colors block mb-1"
+                          >
+                            {item.title}
+                          </a>
+                          <div className="flex gap-2 text-[0.63rem] text-slate-400">
+                            {item.publisher && <span className="text-sky-600 dark:text-[#00C8FF] font-semibold">{item.publisher}</span>}
+                            {item.providerPublishTime && (
+                              <span>{new Date(item.providerPublishTime * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
