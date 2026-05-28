@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type React from "react";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { SignalBadge } from "@/components/ui/Badge";
 import type { TickerInfo, IndicatorSummary, NewsItem, AIAnalysis } from "@/lib/types";
 import { runAnalysis } from "@/lib/api";
 
@@ -262,7 +261,7 @@ export function AnalysisPanel({ ticker, info, news, summary }: Props) {
                 info.previousClose != null && ["Prev Close", `$${(info.previousClose as number).toFixed(2)}`, "text-slate-800 dark:text-slate-200"],
                 (info.dayHigh && info.dayLow) != null && ["Day Range", `$${(info.dayLow as number).toFixed(2)} – $${(info.dayHigh as number).toFixed(2)}`, "text-slate-800 dark:text-slate-200"],
                 info.volume != null && ["Volume",   (info.volume as number).toLocaleString(),  "text-slate-800 dark:text-slate-200"],
-              ].filter(Boolean).map(([lbl, val, cls]) => (
+              ].filter((x): x is string[] => Boolean(x)).map(([lbl, val, cls]) => (
                 <div key={lbl as string} className="flex justify-between py-2 border-b border-slate-200 dark:border-dark-border last:border-0 text-sm">
                   <span className="text-slate-500 text-xs">{lbl}</span>
                   <span className={`font-semibold font-mono ${cls}`}>{val}</span>
