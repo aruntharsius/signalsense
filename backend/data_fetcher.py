@@ -68,11 +68,41 @@ def get_current_price(ticker: str) -> Tuple[Optional[float], Optional[float], Op
     return price, change, pct
 
 
+def _normalize_news_item(item: dict) -> dict:
+    # Old format (pre-0.2.50): title/link/publisher/providerPublishTime at top level
+    if "title" in item:
+        return {
+            "title":               item.get("title"),
+            "link":                item.get("link"),
+            "publisher":           item.get("publisher"),
+            "providerPublishTime": item.get("providerPublishTime"),
+        }
+    # New format (0.2.50+): nested under 'content'
+    content = item.get("content") or {}
+    ts = None
+    pub_date = content.get("pubDate", "")
+    if pub_date:
+        try:
+            from datetime import timezone
+            dt = datetime.fromisoformat(pub_date.replace("Z", "+00:00"))
+            ts = int(dt.astimezone(timezone.utc).timestamp())
+        except Exception:
+            pass
+    canonical = content.get("canonicalUrl") or {}
+    provider  = content.get("provider") or {}
+    return {
+        "title":               content.get("title"),
+        "link":                canonical.get("url") if isinstance(canonical, dict) else None,
+        "publisher":           provider.get("displayName") if isinstance(provider, dict) else None,
+        "providerPublishTime": ts,
+    }
+
+
 @cached(cache=_news_cache, lock=_news_lock)
 def fetch_news(ticker: str) -> list:
     try:
         t = yf.Ticker(ticker.strip().upper())
-        return t.news or []
+        return [_normalize_news_item(i) for i in (t.news or [])]
     except Exception:
         return []
 
