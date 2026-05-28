@@ -188,8 +188,8 @@ export default function DashboardPage() {
         {mainTab === "analysis" && (
           <div className="animate-fade-in">
             {/* Controls */}
-            <div className="flex gap-2 mb-3 flex-wrap items-start">
-              <form onSubmit={handleTickerSubmit} className="flex gap-2 flex-1 min-w-[200px]">
+            <div className="flex flex-col sm:flex-row gap-2 mb-3 items-stretch sm:items-start">
+              <form onSubmit={handleTickerSubmit} className="flex gap-2 flex-1">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value.toUpperCase())}
