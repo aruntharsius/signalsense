@@ -9,6 +9,7 @@ import { Header } from "@/components/dashboard/Header";
 import { PriceHeader } from "@/components/dashboard/PriceHeader";
 import { IndicatorSnapshot } from "@/components/dashboard/IndicatorSnapshot";
 import { DayTradeSetup } from "@/components/dashboard/DayTradeSetup";
+import { SwingSetup } from "@/components/dashboard/SwingSetup";
 import { ChartSection } from "@/components/dashboard/ChartSection";
 import { AnalysisPanel } from "@/components/dashboard/AnalysisPanel";
 import { WatchlistCard } from "@/components/dashboard/WatchlistCard";
@@ -262,6 +263,7 @@ export default function DashboardPage() {
                   <PriceHeader ticker={ticker} priceData={priceData} info={info} />
                   <IndicatorSnapshot summary={summary} />
                   <DayTradeSetup summary={summary} price={priceData.price} />
+                  <SwingSetup    summary={summary} price={priceData.price} />
                   <ChartSection charts={charts as Parameters<typeof ChartSection>[0]["charts"]} />
                 </div>
 

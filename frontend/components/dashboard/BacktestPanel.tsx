@@ -10,13 +10,17 @@ const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-type StrategyKey = "momentum" | "mean_reversion" | "trend" | "breakout";
+type StrategyKey = "momentum" | "mean_reversion" | "trend" | "breakout"
+  | "swing_pullback" | "swing_reversal" | "swing_golden_cross";
 
-const STRATEGIES: Record<StrategyKey, { label: string; icon: string }> = {
-  momentum:       { label: "Momentum",     icon: "⚡" },
-  mean_reversion: { label: "Mean Rev.",    icon: "↩️" },
-  trend:          { label: "Trend Follow", icon: "📈" },
-  breakout:       { label: "Breakout",     icon: "🚀" },
+const STRATEGIES: Record<StrategyKey, { label: string; icon: string; group: "day" | "swing" }> = {
+  momentum:          { label: "Momentum",       icon: "⚡",  group: "day"   },
+  mean_reversion:    { label: "Mean Rev.",       icon: "↩️",  group: "day"   },
+  trend:             { label: "Trend Follow",    icon: "📈",  group: "day"   },
+  breakout:          { label: "Breakout",        icon: "🚀",  group: "day"   },
+  swing_pullback:    { label: "Swing Pullback",  icon: "↩️",  group: "swing" },
+  swing_reversal:    { label: "Swing Reversal",  icon: "🔄",  group: "swing" },
+  swing_golden_cross:{ label: "Golden X Ride",   icon: "✨",  group: "swing" },
 };
 
 const PERIODS: { label: string; days: number }[] = [
@@ -202,25 +206,34 @@ export function BacktestPanel() {
         </div>
 
         {/* Strategy tabs */}
-        <div className="flex gap-1.5 flex-wrap">
-          {(Object.keys(STRATEGIES) as StrategyKey[]).map((key) => {
-            const s      = STRATEGIES[key];
-            const active = key === strategy;
-            return (
-              <button
-                key={key}
-                onClick={() => setStrategy(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[0.72rem] font-semibold transition-colors whitespace-nowrap ${
-                  active
-                    ? "bg-sky-50 border-sky-300 text-sky-600 dark:bg-[#00C8FF1A] dark:border-[#00C8FF55] dark:text-[#00C8FF]"
-                    : "border-light-border dark:border-dark-border text-slate-500 hover:border-sky-300 hover:text-sky-600 dark:hover:border-[#00C8FF44] dark:hover:text-[#00C8FF] bg-white dark:bg-dark-bg3"
-                }`}
-              >
-                <span>{s.icon}</span><span>{s.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {(["day", "swing"] as const).map((group) => (
+          <div key={group}>
+            <p className="text-[0.6rem] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">
+              {group === "day" ? "Day Trade" : "Swing Trade (3–20 days)"}
+            </p>
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {(Object.keys(STRATEGIES) as StrategyKey[])
+                .filter((k) => STRATEGIES[k].group === group)
+                .map((key) => {
+                  const s      = STRATEGIES[key];
+                  const active = key === strategy;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setStrategy(key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[0.72rem] font-semibold transition-colors whitespace-nowrap ${
+                        active
+                          ? "bg-sky-50 border-sky-300 text-sky-600 dark:bg-[#00C8FF1A] dark:border-[#00C8FF55] dark:text-[#00C8FF]"
+                          : "border-light-border dark:border-dark-border text-slate-500 hover:border-sky-300 hover:text-sky-600 dark:hover:border-[#00C8FF44] dark:hover:text-[#00C8FF] bg-white dark:bg-dark-bg3"
+                      }`}
+                    >
+                      <span>{s.icon}</span><span>{s.label}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        ))}
 
         {/* Period selector */}
         <div className="flex gap-1.5">

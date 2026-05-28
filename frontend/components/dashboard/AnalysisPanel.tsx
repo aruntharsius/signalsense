@@ -124,13 +124,20 @@ interface TradeAdvice {
   t2:         number;
 }
 
+type TradeMode = "day" | "swing";
+
 function buildTradeAdvice(
   ticker: string,
   info: TickerInfo,
-  summary: IndicatorSummary
+  summary: IndicatorSummary,
+  mode: TradeMode = "day"
 ): TradeAdvice | null {
   const price = summary.close;
   if (!price) return null;
+
+  const stopMult = mode === "swing" ? 2.5 : 1.5;
+  const t1Mult   = mode === "swing" ? 4.0 : 2.0;
+  const t2Mult   = mode === "swing" ? 8.0 : 4.0;
 
   const name   = (info.longName as string | undefined) || ticker;
   const atr    = (summary.ATR as number | null) ?? price * 0.02;
@@ -159,10 +166,10 @@ function buildTradeAdvice(
 
   if (isBull) {
     const entry      = price;
-    const accumulate = +(price - atr * 0.5).toFixed(2);
-    const stop       = +(price - atr * 1.5).toFixed(2);
-    const t1         = +(price + atr * 2.0).toFixed(2);
-    const t2         = +(price + atr * 4.0).toFixed(2);
+    const accumulate = +(price - atr * stopMult * 0.33).toFixed(2);
+    const stop       = +(price - atr * stopMult).toFixed(2);
+    const t1         = +(price + atr * t1Mult).toFixed(2);
+    const t2         = +(price + atr * t2Mult).toFixed(2);
     const mid        = +((t1 + t2) / 2).toFixed(2);
 
     const open = trend === "up"
@@ -196,10 +203,10 @@ function buildTradeAdvice(
     return { bias: "bullish", narrative, entry, accumulate, stop, t1, t2 };
   } else {
     const entry      = price;
-    const accumulate = +(price + atr * 0.5).toFixed(2);
-    const stop       = +(price + atr * 1.5).toFixed(2);
-    const t1         = +(price - atr * 2.0).toFixed(2);
-    const t2         = +(price - atr * 4.0).toFixed(2);
+    const accumulate = +(price + atr * stopMult * 0.33).toFixed(2);
+    const stop       = +(price + atr * stopMult).toFixed(2);
+    const t1         = +(price - atr * t1Mult).toFixed(2);
+    const t2         = +(price - atr * t2Mult).toFixed(2);
 
     const open = trend === "down"
       ? `${name} has been under sustained selling pressure, with the price action showing continued weakness.`
@@ -231,37 +238,59 @@ function buildTradeAdvice(
   }
 }
 
-function TradeNoteCard({ advice }: { advice: TradeAdvice }) {
+function TradeNoteCard({ ticker, info, summary }: { ticker: string; info: TickerInfo; summary: IndicatorSummary }) {
+  const [mode, setMode] = useState<TradeMode>("day");
+  const advice = buildTradeAdvice(ticker, info, summary, mode);
+  if (!advice) return null;
+
   const bull = advice.bias === "bullish";
   const f    = (n: number) => `$${n.toFixed(2)}`;
 
   const levels = bull
     ? [
-        { label: "Buy",        value: f(advice.entry),      color: "text-emerald-600 dark:text-[#00FF9D]" },
-        { label: "Accumulate", value: f(advice.accumulate), color: "text-emerald-600 dark:text-[#00FF9D]" },
-        { label: "Stop",       value: f(advice.stop),       color: "text-red-600 dark:text-[#FF0055]"     },
-        { label: "Target 1",   value: f(advice.t1),         color: "text-sky-600 dark:text-[#00C8FF]"     },
-        { label: "Target 2",   value: f(advice.t2),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+        { label: mode === "swing" ? "Buy" : "Buy",        value: f(advice.entry),      color: "text-emerald-600 dark:text-[#00FF9D]" },
+        { label: "Accumulate",                             value: f(advice.accumulate), color: "text-emerald-600 dark:text-[#00FF9D]" },
+        { label: "Stop",                                   value: f(advice.stop),       color: "text-red-600 dark:text-[#FF0055]"     },
+        { label: "T1",                                     value: f(advice.t1),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+        { label: "T2",                                     value: f(advice.t2),         color: "text-sky-600 dark:text-[#00C8FF]"     },
       ]
     : [
-        { label: "Sell",       value: f(advice.entry),      color: "text-red-600 dark:text-[#FF0055]"     },
-        { label: "Add",        value: f(advice.accumulate), color: "text-red-600 dark:text-[#FF0055]"     },
-        { label: "Stop",       value: f(advice.stop),       color: "text-emerald-600 dark:text-[#00FF9D]" },
-        { label: "Target 1",   value: f(advice.t1),         color: "text-sky-600 dark:text-[#00C8FF]"     },
-        { label: "Target 2",   value: f(advice.t2),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+        { label: "Sell",      value: f(advice.entry),      color: "text-red-600 dark:text-[#FF0055]"     },
+        { label: "Add",       value: f(advice.accumulate), color: "text-red-600 dark:text-[#FF0055]"     },
+        { label: "Stop",      value: f(advice.stop),       color: "text-emerald-600 dark:text-[#00FF9D]" },
+        { label: "T1",        value: f(advice.t1),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+        { label: "T2",        value: f(advice.t2),         color: "text-sky-600 dark:text-[#00C8FF]"     },
       ];
 
   return (
     <Card>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <CardTitle>📝 Trade Note</CardTitle>
-        <span className={`text-[0.6rem] font-bold px-2 py-0.5 rounded-full border ${
-          bull
-            ? "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-[#00FF9D12] dark:border-[#00FF9D33] dark:text-[#00FF9D]"
-            : "bg-red-50 border-red-200 text-red-600 dark:bg-[#FF005512] dark:border-[#FF005533] dark:text-[#FF0055]"
-        }`}>
-          {bull ? "BULLISH SETUP" : "BEARISH SETUP"}
-        </span>
+        <div className="flex items-center gap-2">
+          {/* Day / Swing toggle */}
+          <div className="flex rounded-lg border border-light-border dark:border-dark-border overflow-hidden text-[0.65rem] font-semibold">
+            {(["day", "swing"] as TradeMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-2.5 py-1 transition-colors ${
+                  mode === m
+                    ? "bg-sky-100 text-sky-600 dark:bg-[#00C8FF1A] dark:text-[#00C8FF]"
+                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                }`}
+              >
+                {m === "day" ? "Day" : "Swing"}
+              </button>
+            ))}
+          </div>
+          <span className={`text-[0.6rem] font-bold px-2 py-0.5 rounded-full border ${
+            bull
+              ? "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-[#00FF9D12] dark:border-[#00FF9D33] dark:text-[#00FF9D]"
+              : "bg-red-50 border-red-200 text-red-600 dark:bg-[#FF005512] dark:border-[#FF005533] dark:text-[#FF0055]"
+          }`}>
+            {bull ? "BULLISH" : "BEARISH"}
+          </span>
+        </div>
       </div>
 
       <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
@@ -278,7 +307,7 @@ function TradeNoteCard({ advice }: { advice: TradeAdvice }) {
       </div>
 
       <p className="text-[0.6rem] text-slate-400 mt-2.5 leading-relaxed">
-        ⚠️ Rule-based levels derived from ATR. Not financial advice — confirm with your own analysis before trading.
+        ⚠️ {mode === "swing" ? "Swing sizing: 2.5× ATR stop, 8× ATR target. Hold 3–20 days." : "Day sizing: 1.5× ATR stop, 4× ATR target."} Not financial advice.
       </p>
     </Card>
   );
@@ -287,7 +316,6 @@ function TradeNoteCard({ advice }: { advice: TradeAdvice }) {
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function AnalysisPanel({ ticker, info, news, summary }: Props) {
-  const tradeAdvice = buildTradeAdvice(ticker, info, summary);
   const [activeTab, setActiveTab] = useState<Tab>("🔍 Analysis");
   const [apiKey, setApiKey]     = useState("");
   const [loading, setLoading]   = useState(false);
@@ -352,7 +380,7 @@ export function AnalysisPanel({ ticker, info, news, summary }: Props) {
             )}
 
             {/* Trade note */}
-            {tradeAdvice && <TradeNoteCard advice={tradeAdvice} />}
+            <TradeNoteCard ticker={ticker} info={info} summary={summary} />
 
             {/* AI analysis */}
             <div>

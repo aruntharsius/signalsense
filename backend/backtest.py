@@ -113,12 +113,98 @@ def _breakout_signal(row: pd.Series) -> int:
     return 0
 
 
-# ATR risk multipliers per strategy (matches frontend)
+def _swing_pullback_signal(row: pd.Series) -> int:
+    bull, bear = 0, 0
+    sma20    = row.get("SMA_20")
+    sma50    = row.get("SMA_50")
+    ema20    = row.get("EMA_20")
+    macd     = row.get("MACD")
+    macd_sig = row.get("MACD_Signal")
+    rsi      = row.get("RSI")
+    close    = row["Close"]
+
+    if _ok(sma20) and _ok(sma50):
+        if sma20 > sma50: bull += 2
+        else:             bear += 2
+    if _ok(ema20) and _ok(sma50):
+        if close > sma50 and close < ema20 * 1.03:
+            bull += 2
+        elif close < sma50 and close > ema20 * 0.97:
+            bear += 2
+    if _ok(sma50):
+        if close > sma50: bull += 1
+        else:             bear += 1
+    if _ok(macd) and _ok(macd_sig):
+        if macd > macd_sig: bull += 1
+        else:               bear += 1
+    if _ok(rsi) and 40 < rsi < 60:
+        bull += 1
+
+    return _vote(bull, bear)
+
+
+def _swing_reversal_signal(row: pd.Series) -> int:
+    bull, bear = 0, 0
+    rsi      = row.get("RSI")
+    close    = row["Close"]
+    bb_lower = row.get("BB_Lower")
+    bb_upper = row.get("BB_Upper")
+    macd_hist = row.get("MACD_Hist")
+
+    if _ok(rsi):
+        if   rsi < 30: bull += 2
+        elif rsi < 40: bull += 1
+        elif rsi > 70: bear += 2
+        elif rsi > 60: bear += 1
+
+    if _ok(bb_lower) and _ok(bb_upper):
+        if   close <= bb_lower * 1.01: bull += 1
+        elif close >= bb_upper * 0.99: bear += 1
+
+    if _ok(macd_hist) and abs(macd_hist) < 0.4:
+        bull += 1
+
+    if bull >= 2 and bull > bear: return 1
+    if bear >= 2 and bear > bull: return -1
+    return 0
+
+
+def _swing_golden_cross_signal(row: pd.Series) -> int:
+    bull, bear = 0, 0
+    sma20    = row.get("SMA_20")
+    sma50    = row.get("SMA_50")
+    macd     = row.get("MACD")
+    macd_sig = row.get("MACD_Signal")
+    rsi      = row.get("RSI")
+    close    = row["Close"]
+
+    if _ok(sma20) and _ok(sma50):
+        if sma20 > sma50: bull += 2
+        else:             bear += 2
+    if _ok(sma20):
+        if close > sma20: bull += 1
+        else:             bear += 1
+    if _ok(sma50):
+        if close > sma50: bull += 1
+        else:             bear += 1
+    if _ok(macd) and _ok(macd_sig):
+        if macd > 0: bull += 1
+        else:        bear += 1
+    if _ok(rsi) and 50 <= rsi <= 70:
+        bull += 1
+
+    return _vote(bull, bear)
+
+
+# (signal_fn, stop_mult, target_mult, max_hold_days)
 _STRATEGIES: dict[str, tuple] = {
-    "momentum":       (_momentum_signal,       1.5),
-    "mean_reversion": (_mean_reversion_signal,  1.0),
-    "trend":          (_trend_signal,            1.2),
-    "breakout":       (_breakout_signal,         1.0),
+    "momentum":            (_momentum_signal,           1.5, 1.5, 15),
+    "mean_reversion":      (_mean_reversion_signal,     1.0, 1.0, 15),
+    "trend":               (_trend_signal,               1.2, 1.2, 15),
+    "breakout":            (_breakout_signal,            1.0, 1.0, 15),
+    "swing_pullback":      (_swing_pullback_signal,      2.5, 5.0, 20),
+    "swing_reversal":      (_swing_reversal_signal,      2.0, 4.0, 20),
+    "swing_golden_cross":  (_swing_golden_cross_signal,  3.0, 6.0, 25),
 }
 
 
@@ -132,7 +218,7 @@ def run_backtest(df: pd.DataFrame, strategy: str) -> dict[str, Any]:
     if strategy not in _STRATEGIES:
         raise ValueError(f"Unknown strategy '{strategy}'. Choose from: {list(_STRATEGIES)}")
 
-    signal_fn, atr_mult = _STRATEGIES[strategy]
+    signal_fn, stop_mult, target_mult, max_hold = _STRATEGIES[strategy]
 
     # Reset index so we can iterate by integer position with a Date column
     rows = df.reset_index()
@@ -158,9 +244,10 @@ def run_backtest(df: pd.DataFrame, strategy: str) -> dict[str, Any]:
             if sig != 0 and _ok(atr) and atr > 0:
                 direction   = sig
                 entry_price = float(rows.iloc[i + 1]["Open"])
-                risk        = atr * atr_mult
-                stop        = entry_price - risk if direction == 1 else entry_price + risk
-                target      = entry_price + risk if direction == 1 else entry_price - risk
+                stop_risk   = atr * stop_mult
+                tgt_reach   = atr * target_mult
+                stop        = entry_price - stop_risk  if direction == 1 else entry_price + stop_risk
+                target      = entry_price + tgt_reach  if direction == 1 else entry_price - tgt_reach
                 entry_date  = str(rows.iloc[i + 1]["Date"])[:10]
                 entry_idx   = i + 1
                 in_trade    = True
@@ -179,7 +266,7 @@ def run_backtest(df: pd.DataFrame, strategy: str) -> dict[str, Any]:
                 if   high >= stop:   exit_price, exit_reason = stop,   "STOP"
                 elif low  <= target: exit_price, exit_reason = target, "TARGET"
 
-            if exit_price is None and holding >= MAX_HOLD:
+            if exit_price is None and holding >= max_hold:
                 exit_price, exit_reason = float(nxt["Close"]), "TIMEOUT"
 
             if exit_price is not None:
