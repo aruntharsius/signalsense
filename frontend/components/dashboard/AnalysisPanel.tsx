@@ -326,7 +326,7 @@ export function AnalysisPanel({ ticker, info, news, summary }: Props) {
         ))}
       </div>
 
-      <div className="p-4 overflow-y-auto max-h-[calc(100vh-180px)]">
+      <div className="p-4 lg:overflow-y-auto lg:max-h-[calc(100vh-180px)]">
 
         {/* ── Analysis Tab ─────────────────────────────────────────────────── */}
         {activeTab === "🔍 Analysis" && (
