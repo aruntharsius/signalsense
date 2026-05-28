@@ -96,7 +96,7 @@ export const runAnalysis = (
 // ── Watchlist ─────────────────────────────────────────────────────────────────
 
 export const fetchWatchlist = () =>
-  request<{ watchlist: Array<Record<string, unknown>> }>("/watchlist");
+  request<{ watchlist: import("./types").WatchlistRow[] }>("/watchlist");
 
 export const addToWatchlist = (ticker: string) =>
   request<{ watchlist: string[] }>("/watchlist", {

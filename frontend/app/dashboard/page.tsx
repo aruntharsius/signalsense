@@ -91,7 +91,7 @@ export default function DashboardPage() {
     setWlLoading(true);
     try {
       const data = await fetchWatchlist();
-      setWatchlist(data.watchlist as WatchlistRow[]);
+      setWatchlist(data.watchlist);
     } catch {
       // silently ignore
     } finally {
