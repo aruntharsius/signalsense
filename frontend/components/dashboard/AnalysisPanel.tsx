@@ -85,9 +85,182 @@ function GlossaryBlock({ title, children }: { title: string; children: React.Rea
   );
 }
 
+// ── Trade note ───────────────────────────────────────────────────────────────
+
+interface TradeAdvice {
+  bias:       "bullish" | "bearish";
+  narrative:  string;
+  entry:      number;
+  accumulate: number;
+  stop:       number;
+  t1:         number;
+  t2:         number;
+}
+
+function buildTradeAdvice(
+  ticker: string,
+  info: TickerInfo,
+  summary: IndicatorSummary
+): TradeAdvice | null {
+  const price = summary.close;
+  if (!price) return null;
+
+  const name   = (info.longName as string | undefined) || ticker;
+  const atr    = (summary.ATR as number | null) ?? price * 0.02;
+  const rsi    = summary.RSI    as number | null;
+  const macd   = summary.MACD   as number | null;
+  const macdS  = summary.MACD_Signal as number | null;
+  const sma20  = summary.SMA_20 as number | null;
+  const sma50  = summary.SMA_50 as number | null;
+  const ema20  = summary.EMA_20 as number | null;
+  const trend  = summary.price_trend_5d;
+  const vol    = summary.volume_trend;
+
+  let bull = 0, bear = 0;
+  if (rsi  !== null) { if (rsi  > 55) bull++; else if (rsi  < 45) bear++; }
+  if (macd !== null && macdS !== null) { if (macd > macdS) bull++; else bear++; }
+  if (sma20 !== null && sma50 !== null) { if (sma20 > sma50) bull++; else bear++; }
+  if (sma20 !== null) { if (price > sma20) bull++; else bear++; }
+  if (trend === "up") bull++; else if (trend === "down") bear++;
+
+  const isBull = bull >= bear;
+  const f = (n: number) => `$${n.toFixed(2)}`;
+
+  const maLabel = sma20
+    ? `20-day moving average (${f(sma20)})`
+    : ema20 ? `20-day EMA (${f(ema20)})` : "key moving average";
+
+  if (isBull) {
+    const entry      = price;
+    const accumulate = +(price - atr * 0.5).toFixed(2);
+    const stop       = +(price - atr * 1.5).toFixed(2);
+    const t1         = +(price + atr * 2.0).toFixed(2);
+    const t2         = +(price + atr * 4.0).toFixed(2);
+    const mid        = +((t1 + t2) / 2).toFixed(2);
+
+    const open = trend === "up"
+      ? `${name} has been gaining strength, with price action indicating continued upward momentum.`
+      : trend === "down"
+      ? `${name} has been pulling back recently, potentially offering an entry opportunity ahead of a recovery.`
+      : `${name} has been consolidating, with technical indicators pointing toward a potential upside move.`;
+
+    const confirms: string[] = [];
+    if (sma20 && price > sma20)              confirms.push(`price is trading above the ${maLabel}, indicating bullishness`);
+    if (rsi   && rsi  > 50)                  confirms.push(`RSI at ${rsi.toFixed(0)} shows healthy momentum`);
+    if (macd  && macdS && macd > macdS)      confirms.push(`MACD is showing a bullish crossover`);
+    if (sma20 && sma50 && sma20 > sma50)     confirms.push(`a golden cross formation reinforces the uptrend`);
+    if (vol === "rising")                    confirms.push(`rising volume supports the move`);
+
+    const tech = confirms.length
+      ? confirms.slice(0, 2)
+          .map((c, i) => i === 0 ? c[0].toUpperCase() + c.slice(1) : c)
+          .join(", and ") + ". "
+      : "";
+
+    const narrative =
+      `${open} ${tech}Going ahead, we expect the rally to gain further momentum, ` +
+      `potentially lifting the stock to ${f(t2)} in the near-term. ` +
+      `Therefore, participants can consider buying at ${f(entry)} and accumulate if the price dips to ${f(accumulate)}. ` +
+      `Place stop-loss at ${f(stop)}. ` +
+      `When the price touches ${f(t1)}, raise the stop-loss to ${f(entry)}. ` +
+      `Tighten the stop-loss to ${f(+(stop + (entry - stop) * 0.85).toFixed(2))} when the stock hits ${f(mid)}. ` +
+      `Book profits at ${f(t2)}.`;
+
+    return { bias: "bullish", narrative, entry, accumulate, stop, t1, t2 };
+  } else {
+    const entry      = price;
+    const accumulate = +(price + atr * 0.5).toFixed(2);
+    const stop       = +(price + atr * 1.5).toFixed(2);
+    const t1         = +(price - atr * 2.0).toFixed(2);
+    const t2         = +(price - atr * 4.0).toFixed(2);
+
+    const open = trend === "down"
+      ? `${name} has been under sustained selling pressure, with the price action showing continued weakness.`
+      : trend === "up"
+      ? `${name} has been rallying into resistance, and indicators suggest the upside may be limited.`
+      : `${name} has been struggling to hold key levels, with indicators pointing toward further downside.`;
+
+    const confirms: string[] = [];
+    if (sma20 && price < sma20)             confirms.push(`price has slipped below the ${maLabel}, indicating weakness`);
+    if (rsi   && rsi  < 50)                 confirms.push(`RSI at ${rsi.toFixed(0)} reflects bearish momentum`);
+    if (macd  && macdS && macd < macdS)     confirms.push(`MACD is showing a bearish crossover`);
+    if (sma20 && sma50 && sma20 < sma50)    confirms.push(`a death cross formation reinforces the downtrend`);
+
+    const tech = confirms.length
+      ? confirms.slice(0, 2)
+          .map((c, i) => i === 0 ? c[0].toUpperCase() + c.slice(1) : c)
+          .join(", and ") + ". "
+      : "";
+
+    const narrative =
+      `${open} ${tech}Going ahead, we expect the selling pressure to persist, ` +
+      `potentially dragging the stock to ${f(t2)} in the near-term. ` +
+      `Therefore, participants can consider selling at ${f(entry)} and add on any rallies to ${f(accumulate)}. ` +
+      `Place stop-loss at ${f(stop)}. ` +
+      `When the price falls to ${f(t1)}, lower the stop-loss to ${f(entry)}. ` +
+      `Book profits at ${f(t2)}.`;
+
+    return { bias: "bearish", narrative, entry, accumulate, stop, t1, t2 };
+  }
+}
+
+function TradeNoteCard({ advice }: { advice: TradeAdvice }) {
+  const bull = advice.bias === "bullish";
+  const f    = (n: number) => `$${n.toFixed(2)}`;
+
+  const levels = bull
+    ? [
+        { label: "Buy",        value: f(advice.entry),      color: "text-emerald-600 dark:text-[#00FF9D]" },
+        { label: "Accumulate", value: f(advice.accumulate), color: "text-emerald-600 dark:text-[#00FF9D]" },
+        { label: "Stop",       value: f(advice.stop),       color: "text-red-600 dark:text-[#FF0055]"     },
+        { label: "Target 1",   value: f(advice.t1),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+        { label: "Target 2",   value: f(advice.t2),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+      ]
+    : [
+        { label: "Sell",       value: f(advice.entry),      color: "text-red-600 dark:text-[#FF0055]"     },
+        { label: "Add",        value: f(advice.accumulate), color: "text-red-600 dark:text-[#FF0055]"     },
+        { label: "Stop",       value: f(advice.stop),       color: "text-emerald-600 dark:text-[#00FF9D]" },
+        { label: "Target 1",   value: f(advice.t1),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+        { label: "Target 2",   value: f(advice.t2),         color: "text-sky-600 dark:text-[#00C8FF]"     },
+      ];
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <CardTitle>📝 Trade Note</CardTitle>
+        <span className={`text-[0.6rem] font-bold px-2 py-0.5 rounded-full border ${
+          bull
+            ? "bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-[#00FF9D12] dark:border-[#00FF9D33] dark:text-[#00FF9D]"
+            : "bg-red-50 border-red-200 text-red-600 dark:bg-[#FF005512] dark:border-[#FF005533] dark:text-[#FF0055]"
+        }`}>
+          {bull ? "BULLISH SETUP" : "BEARISH SETUP"}
+        </span>
+      </div>
+
+      <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+        {advice.narrative}
+      </p>
+
+      <div className="grid grid-cols-5 gap-1.5">
+        {levels.map(({ label, value, color }) => (
+          <div key={label} className="flex flex-col items-center gap-0.5 rounded-lg bg-light-bg3 dark:bg-dark-bg3 px-1.5 py-2 border border-light-border dark:border-dark-border">
+            <span className="text-[0.55rem] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+            <span className={`text-[0.7rem] font-bold font-mono ${color}`}>{value}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[0.6rem] text-slate-400 mt-2.5 leading-relaxed">
+        ⚠️ Rule-based levels derived from ATR. Not financial advice — confirm with your own analysis before trading.
+      </p>
+    </Card>
+  );
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 export function AnalysisPanel({ ticker, info, news, summary }: Props) {
+  const tradeAdvice = buildTradeAdvice(ticker, info, summary);
   const [activeTab, setActiveTab] = useState<Tab>("🔍 Analysis");
   const [apiKey, setApiKey]     = useState("");
   const [loading, setLoading]   = useState(false);
@@ -150,6 +323,9 @@ export function AnalysisPanel({ ticker, info, news, summary }: Props) {
                 ))}
               </Card>
             )}
+
+            {/* Trade note */}
+            {tradeAdvice && <TradeNoteCard advice={tradeAdvice} />}
 
             {/* AI analysis */}
             <div>
