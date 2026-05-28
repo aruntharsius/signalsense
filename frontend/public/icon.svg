@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0d1628"/>
+
+  <!-- Chart bars -->
+  <rect x="90"  y="320" width="88" height="132" rx="12" fill="#00C8FF" opacity="0.30"/>
+  <rect x="212" y="235" width="88" height="217" rx="12" fill="#00C8FF" opacity="0.60"/>
+  <rect x="334" y="130" width="88" height="322" rx="12" fill="#00C8FF"/>
+
+  <!-- Signal arcs above tallest bar -->
+  <path d="M 354 112 Q 378 72  402 112" fill="none" stroke="#00FF9D" stroke-width="18" stroke-linecap="round"/>
+  <path d="M 340  94 Q 378 40  416  94" fill="none" stroke="#00FF9D" stroke-width="15" stroke-linecap="round" opacity="0.60"/>
+  <path d="M 326  76 Q 378  8  430  76" fill="none" stroke="#00FF9D" stroke-width="12" stroke-linecap="round" opacity="0.30"/>
+
+  <!-- Signal dot -->
+  <circle cx="378" cy="122" r="14" fill="#00FF9D"/>
+</svg>

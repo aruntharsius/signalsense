@@ -6,7 +6,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "SignalSense — AI Stock Analysis",
   description: "AI-powered technical analysis dashboard",
-  icons: { icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><text y='32' font-size='32'>📡</text></svg>" },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "SignalSense",
+  },
+  icons: {
+    icon:  [{ url: "/favicon.png", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
