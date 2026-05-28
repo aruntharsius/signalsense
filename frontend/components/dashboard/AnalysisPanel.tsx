@@ -101,11 +101,11 @@ const DAY_TRADE_GLOSSARY = [
 
 function GlossaryBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <details className="rounded-xl border border-light-border dark:border-dark-border overflow-hidden">
-      <summary className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 cursor-pointer bg-light-bg2 dark:bg-dark-bg2 hover:bg-slate-50 dark:hover:bg-[#1a2540] list-none select-none">
+    <details className="rounded-xl border border-light-border dark:border-dark-border">
+      <summary className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 cursor-pointer rounded-xl bg-light-bg2 dark:bg-dark-bg2 hover:bg-slate-50 dark:hover:bg-[#1a2540] list-none select-none">
         {title}
       </summary>
-      <div className="p-3 space-y-2 bg-light-bg2 dark:bg-dark-bg2">
+      <div className="p-3 space-y-2 bg-light-bg2 dark:bg-dark-bg2 rounded-b-xl">
         {children}
       </div>
     </details>
